@@ -7,10 +7,11 @@
     "dev": "nodemon --watch src --ext ts --exec ts-node src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "migrate": "ts-node scripts/migrate.ts",
+    "migrate": "ts-node --skip-project scripts/migrate.ts",
     "test": "jest --runInBand --forceExit",
     "test:watch": "jest --watch",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "build:migrate": "npm run build && npm run migrate"
   },
   "dependencies": {
     "@socket.io/redis-adapter": "^8.3.0",

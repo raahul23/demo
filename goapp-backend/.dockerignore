@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+coverage/
+*.log
+.git/
+tests/
+*.test.ts
+jest.config.ts
+docker-compose.yml
+START.md
+README.md
