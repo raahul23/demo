@@ -1,0 +1,399 @@
+import 'dart:async';
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:goapp/core/service/image_picker_service.dart';
+import 'package:goapp/features/auth/presentation/theme/app_colors.dart';
+import 'package:goapp/features/auth/presentation/widgets/appbar.dart';
+import 'package:goapp/core/storage/registration_progress_store.dart';
+import 'package:goapp/features/city_vehicle/vehicle_details/presentation/cubit/vehicle_details_cubit.dart';
+import 'package:goapp/features/city_vehicle/vehicle_details/presentation/model/vehicle_details_model.dart';
+import 'package:goapp/features/city_vehicle/vehicle_details/presentation/widget/selection_bottom_sheet.dart';
+import 'package:goapp/features/city_vehicle/vehicle_details/presentation/widget/underline_input_field.dart';
+import 'package:goapp/features/city_vehicle/vehicle_details/presentation/widget/vehicle_photo_upload.dart';
+import 'package:goapp/features/city_vehicle/vehicle_selection/presentation/model/vehicle_model.dart';
+import 'package:goapp/features/document_verify/presentation/pages/verification_screen.dart';
+import 'package:goapp/core/widgets/shadow_button.dart';
+import 'package:goapp/core/di/injection.dart';
+
+class VehicleDetailsScreen extends StatelessWidget {
+  const VehicleDetailsScreen({super.key, required this.vehicleType});
+
+  final VehicleType vehicleType;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => sl<VehicleDetailsCubit>(param1: vehicleType),
+      child: _VehicleDetailsView(vehicleType: vehicleType),
+    );
+  }
+}
+
+class _VehicleDetailsView extends StatefulWidget {
+  const _VehicleDetailsView({required this.vehicleType});
+
+  final VehicleType vehicleType;
+
+  @override
+  State<_VehicleDetailsView> createState() => _VehicleDetailsViewState();
+}
+
+class _VehicleDetailsViewState extends State<_VehicleDetailsView> {
+  final _modelController = TextEditingController();
+  final _bikeTypeController = TextEditingController();
+  final _seatController = TextEditingController();
+  final _fuelTypeController = TextEditingController();
+  final _yearController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(
+      RegistrationProgressStore.setStep(
+        RegistrationStep.vehicleDetails,
+        vehicleType: widget.vehicleType.name,
+        clearDocumentStep: true,
+      ),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<VehicleDetailsCubit>().reset();
+      _modelController.clear();
+      _bikeTypeController.clear();
+      _seatController.clear();
+      _fuelTypeController.clear();
+      _yearController.clear();
+    });
+  }
+
+  @override
+  void dispose() {
+    _modelController.dispose();
+    _bikeTypeController.dispose();
+    _seatController.dispose();
+    _fuelTypeController.dispose();
+    _yearController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: AppColors.white,
+        appBar: const AppAppBar(
+          title: 'GoApp',
+          backEnabled: false,
+          bottom: PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(height: 1, color: AppColors.coolwhite),
+          ),
+        ),
+        body: BlocConsumer<VehicleDetailsCubit, VehicleDetailsState>(
+          listener: (context, state) {
+            _bikeTypeController.text = state.bikeTypeDisplay;
+            _seatController.text = state.seatDisplay;
+            _fuelTypeController.text = state.fuelTypeDisplay;
+            if (state.isSubmitted) {
+              unawaited(
+                RegistrationProgressStore.setStep(
+                  RegistrationStep.verification,
+                ),
+              );
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const VerificationScreen()),
+              );
+              context.read<VehicleDetailsCubit>().clearSuccess();
+            }
+          },
+          builder: (context, state) {
+            return Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Vehicle Details',
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.headingNavy,
+                            letterSpacing: -0.6,
+                            height: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Fill in your vehicle details to proceed',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w400,
+                            color: AppColors.gray.shade500,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        VehiclePhotoUpload(
+                          hasPhoto: state.hasPhoto,
+                          uploadPath: state.uploadPath,
+                          uploadName: state.uploadName,
+                          uploadType: state.uploadType,
+                          vehicleType: state.vehicleType,
+                          onTap: () => _showPhotoSourceSheet(context),
+                          onRemove: () =>
+                              context.read<VehicleDetailsCubit>().removePhoto(),
+                        ),
+                        if (state.errors.photo != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            state.errors.photo!,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.hexFFE53935,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 28),
+                        if (state.vehicleType != VehicleType.auto) ...[
+                          UnderlineInputField(
+                            label: 'Model Name',
+                            hint: 'e.g., TVS Ntorq 125cc',
+                            controller: _modelController,
+                            errorText: state.errors.modelName,
+                            keyboardType: TextInputType.text,
+                            onChanged: context
+                                .read<VehicleDetailsCubit>()
+                                .updateModelName,
+                          ),
+                          const SizedBox(height: 22),
+                        ],
+                        if (state.vehicleType == VehicleType.bike) ...[
+                          UnderlineInputField(
+                            label: 'Bike Type',
+                            hint: 'e.g., Scooter',
+                            controller: _bikeTypeController,
+                            errorText: state.errors.bikeType,
+                            readOnly: true,
+                            onTap: () => _showBikeTypeSheet(context, state),
+                          ),
+                          const SizedBox(height: 22),
+                        ],
+                        if (state.vehicleType == VehicleType.cab) ...[
+                          UnderlineInputField(
+                            label: 'Select Seats',
+                            hint: 'Choose seats',
+                            controller: _seatController,
+                            errorText: state.errors.seatOption,
+                            readOnly: true,
+                            onTap: () => _showSeatSheet(context, state),
+                          ),
+                          const SizedBox(height: 22),
+                        ],
+                        UnderlineInputField(
+                          label: 'Fuel Type',
+                          hint: 'Select Fuel',
+                          controller: _fuelTypeController,
+                          errorText: state.errors.fuelType,
+                          readOnly: true,
+                          onTap: () => _showFuelTypeSheet(context, state),
+                        ),
+                        const SizedBox(height: 22),
+                        UnderlineInputField(
+                          label: 'Year',
+                          hint: 'e.g., ${DateTime.now().year}',
+                          controller: _yearController,
+                          errorText: state.errors.year,
+                          keyboardType: TextInputType.number,
+                          onChanged: context
+                              .read<VehicleDetailsCubit>()
+                              .updateYear,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(4),
+                          ],
+                        ),
+                        const SizedBox(height: 32),
+                      ],
+                    ),
+                  ),
+                ),
+                _ContinueButton(
+                  isSubmitting: state.isSubmitting,
+                  enabled: state.isFormValid,
+                  onTap: () {
+                    final cubit = context.read<VehicleDetailsCubit>();
+                    cubit.updateModelName(_modelController.text);
+                    cubit.updateYear(_yearController.text);
+                    cubit.submit();
+                  },
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showBikeTypeSheet(BuildContext context, VehicleDetailsState state) {
+    showSelectionSheet<BikeType>(
+      context: context,
+      title: 'Select Bike Type',
+      options: BikeType.values,
+      selected: state.selectedBikeType,
+      labelBuilder: (t) => t.label,
+      onSelect: (t) => context.read<VehicleDetailsCubit>().selectBikeType(t),
+    );
+  }
+
+  void _showFuelTypeSheet(BuildContext context, VehicleDetailsState state) {
+    showSelectionSheet<FuelType>(
+      context: context,
+      title: 'Select Fuel',
+      options: FuelType.values,
+      selected: state.selectedFuelType,
+      labelBuilder: (t) => t.label,
+      onSelect: (t) => context.read<VehicleDetailsCubit>().selectFuelType(t),
+    );
+  }
+
+  void _showPhotoSourceSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 10),
+              const Text(
+                'Upload Photo',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.headingNavy,
+                ),
+              ),
+              const SizedBox(height: 6),
+              ListTile(
+                leading: const Icon(Icons.camera_alt_rounded),
+                title: const Text('Camera'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  context.read<VehicleDetailsCubit>().pickPhoto(
+                    source: AppImageSource.camera,
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded),
+                title: const Text('Gallery'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  context.read<VehicleDetailsCubit>().pickPhoto(
+                    source: AppImageSource.gallery,
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.description_rounded),
+                title: const Text('Document'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  context.read<VehicleDetailsCubit>().pickDocument();
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSeatSheet(BuildContext context, VehicleDetailsState state) {
+    showSelectionSheet<SeatOption>(
+      context: context,
+      title: 'Select Seats',
+      options: SeatOption.values,
+      selected: state.selectedSeatOption,
+      labelBuilder: (t) => t.label,
+      onSelect: (t) => context.read<VehicleDetailsCubit>().selectSeatOption(t),
+    );
+  }
+}
+
+class _ContinueButton extends StatelessWidget {
+  final bool isSubmitting;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _ContinueButton({
+    required this.isSubmitting,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        12,
+        20,
+        math.max(
+              MediaQuery.viewInsetsOf(context).bottom,
+              MediaQuery.of(context).padding.bottom,
+            ) +
+            20,
+      ),
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        border: Border(top: BorderSide(color: AppColors.coolwhite)),
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: ShadowButton(
+          key: const Key('continue_button'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.emerald,
+            foregroundColor: AppColors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+            ),
+          ),
+          onPressed: (isSubmitting || !enabled) ? null : onTap,
+          child: isSubmitting
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.white),
+                  ),
+                )
+              : const Text(
+                  'Continue',
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
