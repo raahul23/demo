@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "539854737707",
+    "project_id": "goapp-bf9c7",
+    "storage_bucket": "goapp-bf9c7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:539854737707:android:32a2fab300b4dd663cb56e",
+        "android_client_info": {
+          "package_name": "com.sybroxtech.goapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCr9bzlBBMRANle9h9eLbRyVtvsb5HxAeU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

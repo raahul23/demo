@@ -1,0 +1,22 @@
+# Node / Backend
+goapp-backend/node_modules/
+goapp-backend/dist/
+goapp-backend/.env
+goapp-backend/coverage/
+goapp-backend/*.log
+
+# Flutter
+goapp-main/.dart_tool/
+goapp-main/build/
+goapp-main/.flutter-plugins
+goapp-main/.flutter-plugins-dependencies
+goapp-main/pubspec.lock
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp

@@ -1,0 +1,121 @@
+name: CI (development)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches:
+      - development
+
+concurrency:
+  group: ci-development-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-pr:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    env:
+      FIREBASE_ANDROID_JSON_B64: ${{ secrets.FIREBASE_ANDROID_JSON_B64 }}
+      FIREBASE_IOS_PLIST_B64: ${{ secrets.FIREBASE_IOS_PLIST_B64 }}
+      DEV_BUILD_NAME: 1.0.0-dev.${{ github.run_number }}
+      DEV_BUILD_NUMBER: ${{ github.run_number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter Pub Get
+        run: flutter pub get
+
+      - name: Generate Firebase Native Configs
+        run: ./scripts/generate_firebase_configs.sh
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Run Tests
+        run: flutter test
+
+  post-merge-build:
+    if: github.event.action == 'closed' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    env:
+      FIREBASE_ANDROID_JSON_B64: ${{ secrets.FIREBASE_ANDROID_JSON_B64 }}
+      FIREBASE_IOS_PLIST_B64: ${{ secrets.FIREBASE_IOS_PLIST_B64 }}
+      DEV_BUILD_NAME: 1.0.0-dev.${{ github.run_number }}
+      DEV_BUILD_NUMBER: ${{ github.run_number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Debug PR Event Context
+        run: |
+          echo "event_name=${{ github.event_name }}"
+          echo "action=${{ github.event.action }}"
+          echo "merged=${{ github.event.pull_request.merged }}"
+          echo "source=${{ github.event.pull_request.head.ref }}"
+          echo "target=${{ github.event.pull_request.base.ref }}"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter Pub Get
+        run: flutter pub get
+
+      - name: Generate Firebase Native Configs
+        run: ./scripts/generate_firebase_configs.sh
+
+      - name: Print Merge Source/Target
+        run: |
+          echo "Merged source branch: ${{ github.event.pull_request.head.ref }}"
+          echo "Merged target branch: ${{ github.event.pull_request.base.ref }}"
+          echo "Merged source branch: ${{ github.event.pull_request.head.ref }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Merged target branch: ${{ github.event.pull_request.base.ref }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build Android Debug APK
+        run: >
+          flutter build apk
+          --debug
+          --dart-define=ENV=dev
+          --build-name="${DEV_BUILD_NAME}"
+          --build-number="${DEV_BUILD_NUMBER}"
+
+      - name: Build Android Release APK
+        run: >
+          flutter build apk
+          --release
+          --dart-define=ENV=dev
+          --build-name="${DEV_BUILD_NAME}"
+          --build-number="${DEV_BUILD_NUMBER}"
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: goapp-debug-dev-${{ github.event.pull_request.head.sha }}-${{ github.run_number }}
+          path: build/app/outputs/flutter-apk/app-debug.apk
+
+      - name: Upload Release APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: goapp-release-dev-${{ github.event.pull_request.head.sha }}-${{ github.run_number }}
+          path: build/app/outputs/flutter-apk/app-release.apk
